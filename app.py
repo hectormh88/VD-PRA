@@ -47,22 +47,33 @@ def get_graph2(migrants_variable):
     
     df = get_df2()
     
+    
+    labels_a = {
+        'GDP per capita': 'PIB per capita',
+        'Criminality': 'Criminalidad',
+        'Migrants': 'Número de migrantes',
+        'Deaths in conflicts': 'Muertes en conflictos'
+    }
+    
+    labels_b = {
+        'GDP per capita': 'PIB per capita',
+        'Criminality': 'Criminalidad',
+        'Migrants rate': 'Tasa de migrantes',
+        'Deaths in conflicts': 'Muertes en conflictos'
+    }
+    
+    labels = labels_a if migrants_variable == 'Migrants' else labels_b
+    
+    
     fig = px.scatter(df, x='GDP per capita', y='Criminality',
                     size=migrants_variable, color='Deaths in conflicts',
                     hover_name='Country', log_x=True, size_max=40,
                     opacity=0.25,
-                    labels={
-                        'GDP per capita': 'PIB per capita',
-                        'Criminality': 'Criminalidad',
-                        'Country': 'País',
-                        'Deaths in conflicts': 'Muertes en conflictos'
-                    })
+                    labels=labels)
     fig.update_layout(coloraxis_colorbar=dict(title="Muertes en conflictos"))
 
     fig.update_layout(
-        xaxis_title="GDP per capita",
-        yaxis_title="Criminality",
-        legend_title="Deaths in conflicts",
+
 
         xaxis=dict(
             showline=True,
@@ -319,4 +330,4 @@ app.layout = html.Div([
 
 # Main para ejecutar la aplicación
 if __name__ == "__main__":
-    app.run_server(debug=False)
+    app.run_server(debug=True)
