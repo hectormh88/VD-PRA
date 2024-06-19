@@ -1,129 +1,98 @@
 import pandas as pd
 import numpy as np
 
+top1 = pd.read_csv('data/top1_monthly.csv', index_col=0).reset_index(drop=False)
+top1_songs = pd.read_csv('data/top1_monthly_songs.csv', index_col=0).reset_index(drop=False)
+top1_artists_images = pd.read_csv('data/top1_artists_images.csv', index_col=0).reset_index(drop=False)
+monthly_streams = pd.read_csv('data/monthly_streams.csv', index_col=0).reset_index(drop=False)
 
-countries_in_conflict = pd.read_csv('data/countries_in_conflict.csv')
-crime_2021 = pd.read_csv('data/crime_2021.csv')
-GDP_pc = pd.read_csv('data/GDP_pc.csv')
-migrants = pd.read_csv('data/migrants.csv')
-country_codes = pd.read_csv('data/country_codes.csv')
-population = pd.read_excel('data/population.xlsx')
-
-countries_in_conflict.drop(columns=['country_iso_alpha3'], inplace=True)
-countries_in_conflict = countries_in_conflict[~(countries_in_conflict['Country'] == "Yemen People's Republic")]
-
-continent_translation = {
-    'Africa': 'África',
-    'Asia': 'Asia',
-    'Europe': 'Europa',
-    'Northern America': 'Norteamérica',
-    'Oceania': 'Oceanía',
-    'Latin America and the Caribbean': 'Latinoamérica y el Caribe',
-}
-
-gender_translation = {
-    'Both': 'Ambos',
-    'Males': 'Hombres',
-    'Females': 'Mujeres',
-}
-
-def get_df1():
-    countries_in_conflict_grouped = countries_in_conflict.groupby(['Continent', 'Year'])['Deaths in ongoing conflicts'].sum()
-    countries_in_conflict_grouped = countries_in_conflict_grouped.reset_index()
-    return countries_in_conflict_grouped
+top10 = pd.read_csv('data/top10_monthly.csv', index_col=0).reset_index(drop=False)
+top10_songs = pd.read_csv('data/top10_monthly_songs.csv', index_col=0).reset_index(drop=False)
+top10_artists_images = pd.read_csv('data/top10_artists_images.csv', index_col=0).reset_index(drop=False)
 
 
-def get_df2(year=2020):
-    gender = 'Both'
-    migrants_filtered = migrants
-    migrants_filtered = migrants_filtered[migrants_filtered['Gender'] == gender][['Origin ISO', f'{year}']]
-    migrants_filtered = migrants_filtered[migrants_filtered['Origin ISO'] != 'WLD']
-    migrants_grouped = migrants_filtered.groupby('Origin ISO')[f'{year}'].sum().reset_index()
-    crime_2021_filtered = crime_2021[['Code Value', 'Criminality']]
-    GDP_pc_filtered = GDP_pc[~(GDP_pc['Country ISO'].isin(['WLD', 'XKX']))]
-    GDP_pc_filtered = GDP_pc_filtered[GDP_pc_filtered['Year'] == year][['Country ISO', 'GDP per capita']]
-    years = list(range(year-4, year+1))
-    countries_in_conflict_filtered = countries_in_conflict[~(countries_in_conflict['Country ISO'].isin(['XKX', 'YUG']))]
-    countries_in_conflict_filtered = countries_in_conflict_filtered[countries_in_conflict_filtered['Year'].isin(years)][['Country ISO', 'Deaths in ongoing conflicts']]
-    population_filtered = population[['Country', 'Country ISO', year]]
-    population_filtered = population_filtered.rename(columns={year: 'Population'})
-    df_corr = migrants_grouped.merge(crime_2021_filtered, left_on='Origin ISO', right_on='Code Value')
-    df_corr = df_corr.merge(GDP_pc_filtered, left_on='Origin ISO', right_on='Country ISO')
-    df_corr = df_corr.merge(countries_in_conflict_filtered, left_on='Origin ISO', right_on='Country ISO')
-    df_corr = df_corr.merge(population_filtered, left_on='Origin ISO', right_on='Country ISO')
-    df_corr.drop(columns=['Code Value', 'Country ISO_x', 'Country ISO_y', 'Country ISO'], inplace=True)
-    df_corr.rename(columns={'Origin ISO': 'Country ISO', f'{year}': 'Migrants', 'Deaths in ongoing conflicts': 'Deaths in conflicts'}, inplace=True)
-    df_corr['Migrants rate'] = df_corr['Migrants'] / df_corr['Population'] * 100
-    df_corr['Migrants rate'] = df_corr['Migrants rate'].apply(pd.to_numeric)
-    df_corr = df_corr[(df_corr['Population'] > 1000000) & (df_corr['Migrants'] > 100000)]
-    return df_corr
+years = np.arange(2017, 2022)
 
 
-def get_df3(year=2020, migrants_from=100000):
-    GDP_pc_filtered = GDP_pc[~(GDP_pc['Country ISO'].isin(['WLD', 'XKX']))]
-    GDP_pc_filtered = GDP_pc_filtered[GDP_pc_filtered['Year'] == year]
-    gender = 'Both'
-    migrants_filtered = migrants[migrants['Gender'] == gender][['Destination ISO', f'{year}']]
-    migrants_filtered = migrants_filtered[migrants_filtered['Destination ISO'] != 'WLD']
-    migrants_grouped = migrants_filtered.groupby('Destination ISO')[f'{year}'].sum().reset_index()
-    migrants_grouped.rename(columns={f'{year}': 'Immigrants', 'Destination ISO': 'Country ISO'}, inplace=True)
-    df_corr = migrants_grouped.merge(GDP_pc_filtered, left_on='Country ISO', right_on='Country ISO')
-    df_corr = df_corr[df_corr['Immigrants'] > migrants_from]
-    return df_corr
+def get_top10(date, region):
+    filter = (top10['year_month'] == date) & (top10['region'] == region)
+    top10_filtered = top10[filter].reset_index(drop=True).drop(columns=['year_month', 'region']).sort_values('streams', ascending=False)
+    top10_filtered['image'] = top10_filtered['artist'].map(top10_artists_images.set_index('artist')['image'])
+    top10_filtered['image'] = top10_filtered['image'].fillna('assets/no_image.png')
+    return top10_filtered
 
 
-def get_df4(continent):
-    migrants_filtered = migrants[(migrants['Origin ISO'] != 'WLD')]
-    migrants_filtered = migrants_filtered[(migrants_filtered['Destination ISO'] != 'WLD')]
-    migrants_filtered = migrants_filtered[['1990', '1995', '2000', '2005', '2010', '2015', '2020', 'Gender', 'Origin Continent', 'Destination Continent']]
-    migrants_filtered = migrants_filtered.groupby(['Gender', 'Origin Continent', 'Destination Continent']).sum().reset_index()
-    migrants_filtered_origin = migrants_filtered[migrants_filtered['Gender'] != 'Both']
-    migrants_filtered_origin = migrants_filtered_origin.drop(columns=['Destination Continent'])
-    migrants_filtered_origin = migrants_filtered_origin.groupby(['Gender', 'Origin Continent']).sum().reset_index()
-    migrants_filtered_origin = pd.melt(
-        migrants_filtered_origin, id_vars=['Gender', 'Origin Continent'], 
-        var_name='Year', value_name='Migrants')
-    migrants_filtered_origin_temp = migrants_filtered_origin[migrants_filtered_origin['Origin Continent'] == continent]
-    return migrants_filtered_origin_temp
+def get_top10_songs(date, region, artist):
+    filter = (top10_songs['year_month'] == date) & (top10_songs['region'] == region) & (top10_songs['artist'] == artist)
+    top10_songs_filtered = top10_songs[filter].reset_index(drop=True).drop(columns=['year_month', 'region'])
+    return top10_songs_filtered
 
 
-def get_df5():
-    migrants_filtered = migrants[(migrants['Origin ISO'] != 'WLD')]
-    migrants_filtered = migrants_filtered[(migrants_filtered['Destination ISO'] != 'WLD')]
-    migrants_filtered = migrants_filtered[['1990', '1995', '2000', '2005', '2010', '2015', '2020', 'Gender', 'Origin Continent', 'Destination Continent']]
-    migrants_filtered = migrants_filtered.groupby(['Gender', 'Origin Continent', 'Destination Continent']).sum().reset_index()
-    migrants_filtered_both = migrants_filtered[migrants_filtered['Gender'] == 'Both']
-    migrants_filtered_both = migrants_filtered_both.drop(columns=['Gender'])
-    migrants_filtered_both = pd.melt(
-        migrants_filtered_both, id_vars=['Origin Continent', 'Destination Continent'], 
-        var_name='Year', value_name='Migrants')
-    return migrants_filtered_both
+def get_top1(date, region):
+    filter = (top1['year_month'] == date) & (top1['region'] == region)
+    top1_filtered = top1[filter].reset_index(drop=True).drop(columns=['year_month', 'region']).sort_values('streams', ascending=False)
+    top1_filtered['image'] = top1_filtered['artist'].map(top1_artists_images.set_index('artist')['image'])
+    top1_filtered['image'] = top1_filtered['image'].fillna('assets/no_image.png')
+    return top1_filtered
 
 
-def get_df6(year=2020):
-    gender = 'Both'
-    migrants_filtered = migrants[migrants['Gender'] == gender][['Origin ISO', 'Region of origin', f'{year}']]
-    migrants_filtered = migrants_filtered[migrants_filtered['Origin ISO'] != 'WLD']
-    migrants_grouped = migrants_filtered.groupby(['Origin ISO', 'Region of origin'])[f'{year}'].sum().reset_index()
-    migrants_grouped.rename(columns={f'{year}': 'Emigrants', 'Origin ISO': 'Country ISO', 'Region of origin': 'Country'}, inplace=True)
-    years = list(range(year-4, year+1))
-    countries_in_conflict_filtered = countries_in_conflict[~(countries_in_conflict['Country ISO'].isin(['XKX', 'YUG']))]
-    countries_in_conflict_filtered = countries_in_conflict_filtered[countries_in_conflict_filtered['Year'].isin(years)][['Country ISO', 'Deaths in ongoing conflicts']]
-    countries_in_conflict_filtered = countries_in_conflict_filtered.groupby('Country ISO')['Deaths in ongoing conflicts'].sum().reset_index()
-    population_filtered = population[['Country ISO', year]]
-    population_filtered = population_filtered.rename(columns={year: 'Population'})
-    df_corr = migrants_grouped.merge(countries_in_conflict_filtered, on='Country ISO')
-    df_corr = df_corr.merge(population_filtered, on='Country ISO')
-    df_corr['Emigrants rate'] = df_corr['Emigrants'] / df_corr['Population'] * 100
-    df_corr['Emigrants rate'] = df_corr['Emigrants rate'].apply(pd.to_numeric)
-    return df_corr
+def get_top1_songs(date, region):
+    filter = (top1_songs['year_month'] == date) & (top1_songs['region'] == region)
+    top1_songs_filtered = top1_songs[filter].reset_index(drop=True).drop(columns=['year_month', 'region'])
+    return top1_songs_filtered
 
 
-def get_df7(year=2020, head=20):
-    flows = migrants[(migrants['Origin ISO'] != 'WLD')]
-    flows = flows[(flows['Destination ISO'] != 'WLD')]
-    flows = flows[flows['Gender'] == 'Both']
-    flows = flows[['Region of destination', 'Destination ISO', 'Region of origin', 'Origin ISO', f'{year}']]
-    flows = flows.rename(columns={f'{year}': 'Migrants'})
-    flows = flows.sort_values(by='Migrants', ascending=False).reset_index(drop=True).head(head)
-    return flows
+def get_regions():
+    regions = sorted(list(top10['region'].unique()))
+    return regions
+
+
+def get_year_months():
+    year_month = top1['year_month'].unique()
+    return year_month
+
+
+def get_monthly_streams(artist, region):
+    index = monthly_streams[(monthly_streams['artist'] == artist) & (monthly_streams['region'] == region)].columns[2:]
+    values = monthly_streams[(monthly_streams['artist'] == artist) & (monthly_streams['region'] == region)].values[0,2:]
+    return index, values
+
+def get_anual_streams(years, region):
+    df = pd.DataFrame(columns=['year', 'streams'])
+    for year in years:
+        columns = [col for col in monthly_streams.columns if col.startswith(f"{year}-")]
+        columns.insert(0, 'region')
+        filter = (monthly_streams['region'] == region)
+        df_anual_streams = monthly_streams[filter][columns].reset_index(drop=True)
+        df_anual_streams = df_anual_streams.drop(columns='region')
+        anual_streams = df_anual_streams.sum(axis=1)
+        anual_streams = anual_streams.sum()
+        df_year = pd.DataFrame({'year': [year], 'streams': anual_streams})
+        df = pd.concat([df, df_year], ignore_index=True)
+    return df
+
+def get_anual_streams_regions(year):
+    columns = [col for col in monthly_streams.columns if col.startswith(f"{year}-")]
+    columns.insert(0, 'region')
+    columns.insert(1, 'iso_alpha')
+    columns.insert(2, 'artist')
+    df_anual_streams = monthly_streams.loc[:, columns]
+    df_anual_streams[f'{year}'] = df_anual_streams[columns[3:]].sum(axis=1)
+    df_anual_streams = df_anual_streams.drop(columns=columns[3:])
+    df_anual_streams = df_anual_streams.groupby(['region', 'iso_alpha']).sum().reset_index(drop=False)
+    df_anual_streams.rename(columns={f'{year}': 'streams'}, inplace=True)
+    df_anual_streams = df_anual_streams.drop(columns='artist')
+    return df_anual_streams
+
+def get_artists_streams(year_month, region):
+    df = monthly_streams[(monthly_streams['region'] == region)][['artist', year_month]].sort_values(year_month, ascending=False).head(10)
+    index = df['artist'].values
+    values = df[year_month].values
+    return index, values
+
+
+def get_months():
+    month_numbers = np.arange(1, 13)
+    month_names = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December']
+    months = dict(zip(month_names, month_numbers))
+    return months
