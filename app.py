@@ -1,9 +1,5 @@
 import dash
-from dash import html, dcc
-import dash_bootstrap_components as dbc
-import plotly.express as px
-from plotly.subplots import make_subplots
-import plotly.graph_objects as go
+from dash import html
 
 
 
