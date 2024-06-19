@@ -3,4 +3,5 @@ dash-html-components
 dash-bootstrap-components
 plotly
 pandas
+openpyxl
 gunicorn
